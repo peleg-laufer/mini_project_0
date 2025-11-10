@@ -1,1 +1,1 @@
-print(hello! CLI project)
+print("hello! CLI project")
