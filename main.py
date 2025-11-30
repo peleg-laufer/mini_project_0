@@ -38,25 +38,46 @@ class Todo:
         if not os.path.exists(self.db_file_path):
             self.create_new_db_file()
         elif not self.is_db_file_valid():
-            os.remove(self.db_file_path)
+            os.remove(self.db_file_path) # TODO: check why not working
             self.create_new_db_file()
 
     def is_db_file_valid(self):
         """
 
-       :return: True if the db file is good, false if not
+       :return: True if the db file is good, False if not
         """
-        # TODO: check if headers of file good
-        pass
+        # TODO: QA this
+        try:
+            cur = self.get_cur()
+            cur.execute("""
+            PRAGMA table_info(list);
+            """)
+            info = cur.fetchall()
+            print(info)
+        except Exception as e:
+            print(e)
+            return False
+        if info == None or len(info) != 1 or len(info[0]) != 6:
+            return False
+        if info[0] != (0, 'todo_item', 'TEXT', 1, None, 0):
+            return False
         return True
+
+    def get_cur(self):
+        """
+        returns a sqlite cursor on db file
+        :return: cursor on self.db_file
+        """
+        conn = sqlite3.connect(self.db_file_path)
+        cur = conn.cursor()
+        return cur
 
     def create_new_db_file(self):
         """
         creates db file and tables
         :return:
         """
-        conn = sqlite3.connect(self.db_file_path)
-        cur = conn.cursor()
+        cur = self.get_cur()
         cur.execute("""
                     CREATE TABLE list (
                             todo_item TEXT NOT NULL
