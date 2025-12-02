@@ -86,42 +86,41 @@ class Todo:
         assumse no self.db_file exists
         :return:
         """
-        conn = sqlite3.connect(self.db_file_path)
-        cur = conn.cursor()
-        cur.execute(f"""
-                    CREATE TABLE list (
-                            {self.DEFAULT_DB_HEADER[1]} {self.DEFAULT_DB_HEADER[2]} NOT NULL
-                    );
-                    """)
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_file_path) as conn:
+            cur = conn.cursor()
+            cur.execute(f"""
+                        CREATE TABLE list (
+                                {self.DEFAULT_DB_HEADER[1]} {self.DEFAULT_DB_HEADER[2]} NOT NULL
+                        );
+                        """)
+
 
     def print_list(self):
         """
         prints the list of todo_item from self.db_file
         assumes it exists and valid
         """
-        cur = self.conn.cursor()
-        cur.execute(f"""
-            SELECT
-                {self.DEFAULT_DB_HEADER[1]}
-            FROM
-                list;
-        """)
-        info = cur.fetchall()
-        if self.args.quiet:
-            print("TODO list:")
-            if info != None:
-                i = 1
-                for todo_item in info:
-                    print(todo_item[0])
-        else:
-            print("TODO list:")
-            if info != None:
-                i = 1
-                for todo_item in info:
-                    print(f"        item no {i}: {todo_item[0]}")
-                    i += 1
+        with sqlite3.connect(self.db_file_path) as conn:
+            cur = conn.cursor()
+            cur.execute(f"""
+                SELECT
+                    {self.DEFAULT_DB_HEADER[1]}
+                FROM
+                    list;
+            """)
+            info = cur.fetchall()
+            if self.args.quiet:
+                print("TODO list:")
+                if info != None:
+                    for todo_item in info:
+                        print(todo_item[0])
+            else:
+                print("TODO list is:")
+                if info != None:
+                    i = 1
+                    for todo_item in info:
+                        print(f"        item no {i}: {todo_item[0]}")
+                        i += 1
 
 
     def add_to_db(self, todo_item):
@@ -131,14 +130,14 @@ class Todo:
         :param todo_item: item to add to table (has to be non-null string)
         """
         if todo_item is not None:
-            cur = self.conn.cursor()
-            print(f"inserting '{todo_item}' to {self.DEFAULT_DB_HEADER[1]} column in list table")
-            query = f"""
-                INSERT INTO list ({self.DEFAULT_DB_HEADER[1]})
-                VALUES(?);
-            """
-            cur.execute(query, (todo_item,))
-            self.conn.commit()
+            with sqlite3.connect(self.db_file_path) as conn:
+                cur = conn.cursor()
+                print(f"inserting '{todo_item}' to {self.DEFAULT_DB_HEADER[1]} column in list table")
+                query = f"""
+                    INSERT INTO list ({self.DEFAULT_DB_HEADER[1]})
+                    VALUES(?);
+                """
+                cur.execute(query, (todo_item,))
         else:
             print("invalid todo_item inserted")
 
@@ -167,8 +166,6 @@ class Todo:
         elif command == None:
             print("printing help")
             self.print_help()
-        self.conn.commit()
-        self.conn.close()
 
 
     def __init__(self):
@@ -178,7 +175,6 @@ class Todo:
         print("setting up")
         self.parsers_setup()
         self.sqlite_setup()
-        self.conn = sqlite3.connect(self.db_file_path)
         self.handle_req()
 
 if __name__ == '__main__':
