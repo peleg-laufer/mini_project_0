@@ -11,7 +11,6 @@ class Todo:
         """"
         sets up parsers
         """
-        print("setting up parsers")
         self.parser = argparse.ArgumentParser(prog="ToDo list",
                                          description="Add to a list and see all your Todo stuff",
                                          epilog="good luck and best regards"
@@ -30,20 +29,57 @@ class Todo:
         group = self.parser_list.add_mutually_exclusive_group()
         group.add_argument("-q", "--quiet", action="store_true")
 
-        print("     parsers set up successfully")
 
     def sqlite_setup(self):
         """
         checks if there is a db file self.db_file_path and if valid, creates one if not
         """
+        query = f"""
+                    CREATE TABLE IF NOT EXISTS list (
+                            todo_item TEXT NOT NULL
+                    );
+                    """
+        self.execute_query(query)
+
+
+
+    def print_list(self):
+        """
+        prints the list of todo_item from self.db_file
+        assumes it exists and valid
+        """
+        query = f"""
+            SELECT
+                *
+            FROM
+                list;
+            """
+        info = self.execute_query(query)
+        if self.args.quiet:
+            print("TODO list:")
+            if info != None:
+                for todo_item in info:
+                    print(todo_item[0])
+        else:
+            print("TODO list is:")
+            if info != None:
+                i = 1
+                for todo_item in info:
+                    print(f"        item no {i}: {todo_item[0]}")
+                    i += 1
+
+    def execute_query_arg(self,query, item):
+        """
+        executes query on self.db_file, returns query output
+        :param query: a str of valid query
+        :param item: gets str to add to the query
+        :return: query output, None if no output
+        """
         try:
             with sqlite3.connect(self.db_file_path) as conn:
                 cur = conn.cursor()
-                cur.execute(f"""
-                            CREATE TABLE IF NOT EXISTS list (
-                                    todo_item TEXT NOT NULL
-                            );
-                            """)
+                cur.execute(query, (item,))
+                output = cur.fetchall()
         except sqlite3.OperationalError as e:
             # unclosed connection causing problems usually
             print(f"cant access the file, probably open somewhere. error code: {e}")
@@ -54,37 +90,33 @@ class Todo:
         except Exception as e:
             print(f"unusual error. error code: {e}")
         else:
-            pass
+            print(f"successfully done query: {query} with param: {item}")
+            return output
 
 
-
-    def print_list(self):
+    def execute_query(self, query):
         """
-        prints the list of todo_item from self.db_file
-        assumes it exists and valid
-        """
-        with sqlite3.connect(self.db_file_path) as conn:
-            cur = conn.cursor()
-            cur.execute(f"""
-                SELECT
-                    *
-                FROM
-                    list;
-            """)
-            info = cur.fetchall()
-            if self.args.quiet:
-                print("TODO list:")
-                if info != None:
-                    for todo_item in info:
-                        print(todo_item[0])
-            else:
-                print("TODO list is:")
-                if info != None:
-                    i = 1
-                    for todo_item in info:
-                        print(f"        item no {i}: {todo_item[0]}")
-                        i += 1
 
+        :param query: a str of valid query
+        :return: query info return (fetchall())
+        """
+        try:
+            with sqlite3.connect(self.db_file_path) as conn:
+                cur = conn.cursor()
+                cur.execute(query)
+                output = cur.fetchall()
+        except sqlite3.OperationalError as e:
+            # unclosed connection causing problems usually
+            print(f"cant access the file, probably open somewhere. error code: {e}")
+        except sqlite3.DatabaseError as e:
+            # self.db_file is corrupt, cant continue
+            print(f"Critical Database Error: {e}. fix the file to use program")
+            sys.exit(1)
+        except Exception as e:
+            print(f"unusual error. error code: {e}")
+        else:
+            print(f"successfully done query: {query}")
+            return output
 
     def add_to_db(self, todo_item):
         """
@@ -93,25 +125,11 @@ class Todo:
         :param todo_item: item to add to table (has to be non-null string)
         """
         if todo_item is not None:
-            try:
-                with sqlite3.connect(self.db_file_path) as conn:
-                    cur = conn.cursor()
-                    query = f"""
-                                        INSERT INTO list (todo_item)
-                                        VALUES(?);
-                                    """
-                    cur.execute(query, (todo_item,))
-            except sqlite3.OperationalError as e:
-                # unclosed connection causing problems usually
-                print(f"cant access the file, probably open somewhere. error code: {e}")
-            except sqlite3.DatabaseError as e:
-                # self.db_file is corrupt, cant continue
-                print(f"Critical Database Error: {e}. fix the file to use program")
-                sys.exit(1)
-            except Exception as e:
-                print(f"unusual error. error code: {e}")
-            else:
-                pass
+            query = f"""
+                                INSERT INTO list (todo_item)
+                                VALUES(?);
+                            """
+            self.execute_query_arg(query, todo_item)
         else:
             print("invalid todo_item inserted")
 
@@ -131,26 +149,30 @@ class Todo:
         self.args = self.parser.parse_args()
         command = self.args.command
         if command == "list":
-            print("printing todo list...")
             self.print_list()
         elif command == "add":
-            print(f"adding new item to list: ")
-            print(self.args.item)
             self.add_to_db(self.args.item)
         elif command == None:
-            print("printing help")
             self.print_help()
 
 
     def __init__(self):
+        """
+        initializes the parsers, and db file.
+        """
         # default header: (0, 'todo_item', 'TEXT', 1, None, 0)  # (column index, column name, type, is non-null, default, is pk primary key)
         self.db_file_path = r"listdb.db"
-        print("setting up")
         self.parsers_setup()
         self.sqlite_setup()
 
+    def run(self):
+        """
+        main function. after setup by init. handles request
+        :return: None
+        """
+        self.handle_req()
 
 if __name__ == '__main__':
     todo_list = Todo()
-    todo_list.handle_req()
+    todo_list.run()
 
