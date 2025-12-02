@@ -1,6 +1,7 @@
 import argparse
 import os.path
 import sqlite3
+import sys
 from xmlrpc.client import Boolean
 
 
@@ -35,64 +36,26 @@ class Todo:
         """
         checks if there is a db file self.db_file_path and if valid, creates one if not
         """
-        self.db_file_path = r"listdb.db"
-        print(f"setting up sqlite DB on {self.db_file_path}")
-        if not os.path.exists(self.db_file_path):
-            print(      f"db file {self.db_file_path} not exist")
-            self.create_new_db_file()
-        elif not self.is_db_file_valid():
-            print(      f"db file {self.db_file_path} not valid")
-            print(      "deleting existing file")
-            os.remove(self.db_file_path) # TODO: check why not working
-            self.create_new_db_file()
-        else:
-            print("db file exists and valid")
-
-
-    def is_db_file_valid(self):
-        """
-
-       :return: True if the db file is good, False if not, assumes self.db_file exists
-        """
         try:
-            print(f"check validity of db file in {self.db_file_path}")
-            conn = sqlite3.connect(self.db_file_path)
-            print("     connected to db file")
-            cur = conn.cursor()
-            print("     got cursor on db file")
-            cur.execute("""
-            PRAGMA table_info(list);
-            """)
-            print("     executed PRAGMA")
-            info = cur.fetchall()
-            print("     got header of list table on db file: " + str(info))
+            with sqlite3.connect(self.db_file_path) as conn:
+                cur = conn.cursor()
+                cur.execute(f"""
+                            CREATE TABLE IF NOT EXISTS list (
+                                    todo_item TEXT NOT NULL
+                            );
+                            """)
+        except sqlite3.OperationalError as e:
+            # unclosed connection causing problems usually
+            print(f"cant access the file, probably open somewhere. error code: {e}")
+        except sqlite3.DatabaseError as e:
+            # self.db_file is corrupt, cant continue
+            print(f"Critical Database Error: {e}. fix the file to use program")
+            sys.exit(1)
         except Exception as e:
-            print("error in checking db file: ")
-            print(e)
-            conn.close()
-            return False
-        db_is_valid = True
-        if info == None or len(info) != 1 or len(info[0]) != 6:
-            db_is_valid = False
-        elif info[0] != self.DEFAULT_DB_HEADER:
-            db_is_valid = False
-        conn.close()
-        return db_is_valid
+            print(f"unusual error. error code: {e}")
+        else:
+            pass
 
-
-    def create_new_db_file(self):
-        """
-        creates db file and tables on self.db_file
-        assumse no self.db_file exists
-        :return:
-        """
-        with sqlite3.connect(self.db_file_path) as conn:
-            cur = conn.cursor()
-            cur.execute(f"""
-                        CREATE TABLE list (
-                                {self.DEFAULT_DB_HEADER[1]} {self.DEFAULT_DB_HEADER[2]} NOT NULL
-                        );
-                        """)
 
 
     def print_list(self):
@@ -104,7 +67,7 @@ class Todo:
             cur = conn.cursor()
             cur.execute(f"""
                 SELECT
-                    {self.DEFAULT_DB_HEADER[1]}
+                    *
                 FROM
                     list;
             """)
@@ -130,14 +93,25 @@ class Todo:
         :param todo_item: item to add to table (has to be non-null string)
         """
         if todo_item is not None:
-            with sqlite3.connect(self.db_file_path) as conn:
-                cur = conn.cursor()
-                print(f"inserting '{todo_item}' to {self.DEFAULT_DB_HEADER[1]} column in list table")
-                query = f"""
-                    INSERT INTO list ({self.DEFAULT_DB_HEADER[1]})
-                    VALUES(?);
-                """
-                cur.execute(query, (todo_item,))
+            try:
+                with sqlite3.connect(self.db_file_path) as conn:
+                    cur = conn.cursor()
+                    query = f"""
+                                        INSERT INTO list (todo_item)
+                                        VALUES(?);
+                                    """
+                    cur.execute(query, (todo_item,))
+            except sqlite3.OperationalError as e:
+                # unclosed connection causing problems usually
+                print(f"cant access the file, probably open somewhere. error code: {e}")
+            except sqlite3.DatabaseError as e:
+                # self.db_file is corrupt, cant continue
+                print(f"Critical Database Error: {e}. fix the file to use program")
+                sys.exit(1)
+            except Exception as e:
+                print(f"unusual error. error code: {e}")
+            else:
+                pass
         else:
             print("invalid todo_item inserted")
 
@@ -169,13 +143,14 @@ class Todo:
 
 
     def __init__(self):
-        self.DEFAULT_DB_HEADER = (0, 'todo_item', 'TEXT', 1, None,
-                                  0)  # (column index, column name, type, is non-null, default, is pk primary key)
-        print(f"DEFAULT_DB_HEADER: {self.DEFAULT_DB_HEADER}")
+        # default header: (0, 'todo_item', 'TEXT', 1, None, 0)  # (column index, column name, type, is non-null, default, is pk primary key)
+        self.db_file_path = r"listdb.db"
         print("setting up")
         self.parsers_setup()
         self.sqlite_setup()
-        self.handle_req()
+
 
 if __name__ == '__main__':
-    Todo()
+    todo_list = Todo()
+    todo_list.handle_req()
+
