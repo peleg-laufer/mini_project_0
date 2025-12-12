@@ -1,8 +1,6 @@
 import argparse
-import os.path
 import sqlite3
 import sys
-from xmlrpc.client import Boolean
 
 
 class Todo:
@@ -27,12 +25,12 @@ class Todo:
         self.parser_list = self.subparsers.add_parser('list',
                                             help='show todo list')
         group = self.parser_list.add_mutually_exclusive_group()
-        group.add_argument("-q", "--quiet", action="store_true")
+        group.add_argument("-q", "--quiet", action="store_true", help='write the list more shortly')
 
 
     def sqlite_setup(self):
         """
-        checks if there is a db file self.db_file_path and if valid, creates one if not
+        adds relevant list if not exists
         """
         query = f"""
                     CREATE TABLE IF NOT EXISTS list (
@@ -76,7 +74,7 @@ class Todo:
         :return: query output, None if no output
         """
         try:
-            with sqlite3.connect(self.db_file_path) as conn:
+            with sqlite3.connect(self.DB_FILE_PATH) as conn:
                 cur = conn.cursor()
                 cur.execute(query, (item,))
                 output = cur.fetchall()
@@ -90,7 +88,6 @@ class Todo:
         except Exception as e:
             print(f"unusual error. error code: {e}")
         else:
-            print(f"successfully done query: {query} with param: {item}")
             return output
 
 
@@ -101,7 +98,7 @@ class Todo:
         :return: query info return (fetchall())
         """
         try:
-            with sqlite3.connect(self.db_file_path) as conn:
+            with sqlite3.connect(self.DB_FILE_PATH) as conn:
                 cur = conn.cursor()
                 cur.execute(query)
                 output = cur.fetchall()
@@ -115,7 +112,6 @@ class Todo:
         except Exception as e:
             print(f"unusual error. error code: {e}")
         else:
-            print(f"successfully done query: {query}")
             return output
 
     def add_to_db(self, todo_item):
@@ -138,8 +134,8 @@ class Todo:
         prints this.parser help
         assumes exists, valid
         """
-        # TODO
-        pass
+        self.parser.print_help()
+        
 
 
     def handle_req(self):
@@ -161,7 +157,7 @@ class Todo:
         initializes the parsers, and db file.
         """
         # default header: (0, 'todo_item', 'TEXT', 1, None, 0)  # (column index, column name, type, is non-null, default, is pk primary key)
-        self.db_file_path = r"listdb.db"
+        self.DB_FILE_PATH = r"listdb.db"
         self.parsers_setup()
         self.sqlite_setup()
 
