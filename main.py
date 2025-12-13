@@ -135,7 +135,7 @@ class Todo:
         assumes exists, valid
         """
         self.parser.print_help()
-        
+
 
 
     def handle_req(self):
