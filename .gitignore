@@ -1,5 +1,7 @@
 /__pycache__
 /idea.
 /vscode.
+.idea/
 argparse_try.py
 listdb.db
+try.db
